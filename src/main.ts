@@ -4,6 +4,7 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { useContainer } from 'class-validator';
 import { ConfigService } from '@nestjs/config';
 import { ValidationPipe } from '@nestjs/common';
+import { Transport } from '@nestjs/microservices';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -25,6 +26,14 @@ async function bootstrap() {
     }),
   );
 
+  app.connectMicroservice({
+    transport: Transport.TCP,
+    options: {
+      host: '0.0.0.0',
+      port: configService.get('TCP'),
+    },
+  });
+
   const config = new DocumentBuilder()
     .setTitle('Patient API')
     .setDescription('The Patient API description')
@@ -34,9 +43,12 @@ async function bootstrap() {
   app.setGlobalPrefix('patient');
 
   const document = SwaggerModule.createDocument(app, config, {});
+
   SwaggerModule.setup('api', app, document, {
     useGlobalPrefix: true,
   });
+
+  await app.startAllMicroservices();
 
   await app.listen(configService.get<number>('PORT') || 3000);
 }
