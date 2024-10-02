@@ -38,7 +38,7 @@ resource "aws_lb_target_group" "patient_target_group" {
 
 resource "aws_lb_listener_rule" "patient_rule" {
   listener_arn = var.alb_lb_listener_rule_arn
-  priority     = 100
+  priority     = 101
   action {
     type             = "forward"
     target_group_arn = aws_lb_target_group.patient_target_group.arn
@@ -53,12 +53,12 @@ resource "aws_lb_listener_rule" "patient_rule" {
 resource "aws_ecs_service" "patient_service" {
   name            = "patient-service"
   cluster         = var.cluster_id
-  task_definition = aws_ecs_task_definition.organization_task.arn
+  task_definition = aws_ecs_task_definition.patient_task.arn
   desired_count   = 1
 
   load_balancer {
-    target_group_arn = aws_lb_target_group.organization_target_group.arn
-    container_name   = "nest-ecr-organization"
+    target_group_arn = aws_lb_target_group.patient_target_group.arn
+    container_name   = "nest-ecr-patient"
     container_port   = 3000
   }
 
@@ -69,6 +69,30 @@ resource "aws_ecs_service" "patient_service" {
   }
 
   launch_type = "FARGATE"
+
+  service_registries {
+    registry_arn = aws_service_discovery_service.patient_discovery_service.arn
+  }
+}
+
+resource "aws_service_discovery_private_dns_namespace" "patient_dns_namespace" {
+  name = "services.local"
+  vpc  = var.default_vpc_id
+}
+
+resource "aws_service_discovery_service" "patient_discovery_service" {
+  name         = "patient-service"
+  namespace_id = aws_service_discovery_private_dns_namespace.patient_dns_namespace.id
+  dns_config {
+    namespace_id = aws_service_discovery_private_dns_namespace.patient_dns_namespace.id
+    dns_records {
+      ttl  = 60
+      type = "A"
+    }
+  }
+  health_check_custom_config {
+    failure_threshold = 1
+  }
 }
 
 resource "aws_ecs_task_definition" "patient_task" {
