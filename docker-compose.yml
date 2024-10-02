@@ -1,32 +1,44 @@
 version: '3.8'
 services:
   postgres-patient:
-    image: postgres
-    restart: always
+    container_name: postgres-patient
+    image: postgres:16
+    # restart: always
     ports:
       - '5432:5432'
     env_file:
       - .env
     volumes:
-      - postgres:/var/lib/postgresql/data
+      - postgres-patient-data:/var/lib/postgresql/data
+    networks:
+      - ecs_microservices_network
 
-  # nest-ecs-patients:
-  #   build:
-  #     context: .
-  #     args:
-  #       DATABASE_URL: $DATABASE_URL
-  #       PORT: 3000
-  #     dockerfile: ./Dockerfile
-  #     target: development
-  #   command: sh -c "npx prisma migrate dev && npm run start:dev"
-  #   env_file:
-  #     - .env
-  #   ports:
-  #     - '3000:3000'
-  #   volumes:
-  #     - .:/usr/src/app
-  #   depends_on:
-  #     - postgres-patient
+  nest-ecs-patients:
+    container_name: nest-ecs-patients
+    build:
+      context: .
+      args:
+        DATABASE_URL: $DATABASE_URL
+        PORT: $PORT
+        TCP: $TCP
+      dockerfile: ./Dockerfile
+      target: development
+    command: sh -c "npx prisma migrate dev && npm run start:dev"
+    env_file:
+      - .env
+    ports:
+      - '3000:$PORT'
+      - '3001:$TCP'
+    volumes:
+      - .:/usr/src/app
+    depends_on:
+      - postgres-patient
+    networks:
+      - ecs_microservices_network
 
 volumes:
-  postgres:
+  postgres-patient-data:
+
+networks:
+  ecs_microservices_network:
+    driver: bridge

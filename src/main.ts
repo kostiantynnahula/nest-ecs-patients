@@ -50,6 +50,9 @@ async function bootstrap() {
 
   await app.startAllMicroservices();
 
+  const port = configService.get<number>('PORT') || 3000;
+  console.log(port, 'port');
+  console.log(configService.get('TCP'), 'tcp');
   await app.listen(configService.get<number>('PORT') || 3000);
 }
 bootstrap();
