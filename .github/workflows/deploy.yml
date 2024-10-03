@@ -11,6 +11,8 @@ on:
 
 env:
   DATABASE_URL: ${{ secrets.DATABASE_URL }}
+  PORT: ${{ vars.PORT }}
+  ECR_REPO_NAME: ${{ vars.ECR_REPO_NAME }}
 
 jobs:
   
@@ -20,46 +22,33 @@ jobs:
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       AWS_REGION: ${{ secrets.AWS_REGION }}
-      REPO_NAME: nest-ecr-patient
     steps:
     - uses: actions/checkout@v4
 
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v1
+    - name: Set up AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
       with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: ${{ secrets.AWS_REGION }}
+        aws-region: ${{ env.AWS_REGION }}
 
     - name: Login to Amazon ECR
       id: login-ecr
-      uses: aws-actions/amazon-ecr-login@v1
-
-    # - name: Get commit info and timestamp
-    #   id: info
-    #   run: |
-    #     echo "commit=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
-    #     echo "timestamp=$(date +'%Y-%m-%d-%H-%M')" >> $GITHUB_ENV
+      uses: aws-actions/amazon-ecr-login@v2
 
     - name: Get commit hash
       id: get-commit-hash
-      run: echo "::set-output name=commit-hash::$(git rev-parse --short HEAD)"
+      run: echo "commit-hash=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+
     - name: Get timestamp
       id: get-timestamp
-      run: echo "::set-output name=timestamp::$(date +'%Y-%m-%d-%H-%M')"
+      run: echo "timestamp=$(date +'%Y-%m-%d-%H-%M')" >> $GITHUB_ENV
 
     - name: Build, tag, and push the image to Amazon ECR
-      id: build-image
-      env:
-        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        ECR_REPOSITORY: nest-ecr-patient
-        IMAGE_TAG: ${{ steps.get-commit-hash.outputs.commit-hash }}-${{ steps.get-timestamp.outputs.timestamp }}
       run: |
         docker build \
           --build-arg DATABASE_URL="${DATABASE_URL}" \
-          --build-arg PORT=3000 \
-          -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          --build-arg PORT=${PORT} \
+          -t ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPO_NAME }}:${{ env.commit-hash }}-${{ env.timestamp }} .
+        docker push ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPO_NAME }}:${{ env.commit-hash }}-${{ env.timestamp }}
 
     - name: Install Terraform
       uses: hashicorp/setup-terraform@v2
@@ -68,21 +57,7 @@ jobs:
     
     - name: Terraform Init
       run: terraform init
-      env: 
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        AWS_REGION: ${{ secrets.AWS_REGION }}
-    
-    # - name: Terraform Destroy
-    #   run: terraform destroy -var 'container_image=${{ steps.login-ecr.outputs.registry }}/nest-ai:${{ steps.get-commit-hash.outputs.commit-hash }}-${{ steps.get-timestamp.outputs.timestamp }}' -auto-approve
-    #   env:
-    #     AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-    #     AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-    #     AWS_REGION: ${{ secrets.AWS_REGION }}
 
     - name: Terraform Apply
       run: terraform apply -var 'container_image=${{ steps.login-ecr.outputs.registry }}/nest-ecr-patient:${{ steps.get-commit-hash.outputs.commit-hash }}-${{ steps.get-timestamp.outputs.timestamp }}' -auto-approve
-      env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        AWS_REGION: ${{ secrets.AWS_REGION }}
+
