@@ -56,8 +56,10 @@ jobs:
         terraform_version: 1.5.0
     
     - name: Terraform Init
+      working-directory: ./terraform
       run: terraform init
 
     - name: Terraform Apply
+      working-directory: ./terraform
       run: terraform apply -var 'container_image=${{ steps.login-ecr.outputs.registry }}/nest-ecr-patient:${{ steps.get-commit-hash.outputs.commit-hash }}-${{ steps.get-timestamp.outputs.timestamp }}' -auto-approve
 
