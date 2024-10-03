@@ -24,7 +24,7 @@ resource "aws_lb_target_group" "patient_target_group" {
   port        = 3000
   protocol    = "HTTP"
   target_type = "ip"
-  vpc_id      = var.default_vpc_id # default VPC
+  vpc_id      = data.terraform_remote_state.infra.outputs.default_vpc_id # default VPC
   health_check {
     path                = "/patient/health"
     protocol            = "HTTP"
@@ -37,7 +37,7 @@ resource "aws_lb_target_group" "patient_target_group" {
 }
 
 resource "aws_lb_listener_rule" "patient_rule" {
-  listener_arn = var.alb_lb_listener_rule_arn
+  listener_arn = data.terraform_remote_state.infra.outputs.alb_lb_listener_rule_arn
   priority     = 101
   action {
     type             = "forward"
@@ -52,7 +52,7 @@ resource "aws_lb_listener_rule" "patient_rule" {
 
 resource "aws_ecs_service" "patient_service" {
   name            = "patient-service"
-  cluster         = var.cluster_id
+  cluster         = data.terraform_remote_state.infra.outputs.cluster_id
   task_definition = aws_ecs_task_definition.patient_task.arn
   desired_count   = 1
 
@@ -63,8 +63,8 @@ resource "aws_ecs_service" "patient_service" {
   }
 
   network_configuration {
-    subnets          = [var.default_subnet_a_id, var.default_subnet_b_id]
-    security_groups  = [var.ecs_service_sg_id]
+    subnets          = [data.terraform_remote_state.infra.outputs.default_subnet_a_id, data.terraform_remote_state.infra.outputs.default_subnet_a_id]
+    security_groups  = [data.terraform_remote_state.infra.outputs.ecs_service_sg_id]
     assign_public_ip = true
   }
 
@@ -77,7 +77,7 @@ resource "aws_ecs_service" "patient_service" {
 
 resource "aws_service_discovery_private_dns_namespace" "patient_dns_namespace" {
   name = "services.local"
-  vpc  = var.default_vpc_id
+  vpc  = data.terraform_remote_state.infra.outputs.default_vpc_id
 }
 
 resource "aws_service_discovery_service" "patient_discovery_service" {
@@ -101,7 +101,7 @@ resource "aws_ecs_task_definition" "patient_task" {
   requires_compatibilities = ["FARGATE"]
   cpu                      = 256
   memory                   = 512
-  execution_role_arn       = var.ecs_task_execution_role_arn
+  execution_role_arn       = data.terraform_remote_state.infra.outputs.ecs_task_execution_role_arn
 
   container_definitions = <<DEFINITION
   [
